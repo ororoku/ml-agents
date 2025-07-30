@@ -31,6 +31,9 @@ public class WalkerAgent : Agent
     //The direction an agent will walk during training.
     private Vector3 m_WorldDirToWalk = Vector3.right;
 
+    //Noisy target position for training
+    private Vector3 m_NoisyTargetPosition;
+
     [Header("Target To Walk Towards")] public Transform target; //Target the agent will walk towards during training.
 
     [Header("Body Parts")] public Transform hips;
@@ -105,6 +108,13 @@ public class WalkerAgent : Agent
         //Set our goal walking speed
         MTargetWalkingSpeed =
             randomizeWalkSpeedEachEpisode ? Random.Range(0.1f, m_maxWalkingSpeed) : MTargetWalkingSpeed;
+
+        //Generate noisy target position for this episode
+        m_NoisyTargetPosition = target.transform.position + new Vector3(
+            0,
+            0,
+            0
+        );
     }
 
     /// <summary>
@@ -117,7 +127,7 @@ public class WalkerAgent : Agent
 
         //Get velocities in the context of our orientation cube's space
         //Note: You can get these velocities in world space as well but it may not train as well.
-        sensor.AddObservation(m_OrientationCube.transform.InverseTransformDirection(bp.rb.linearVelocity));
+        sensor.AddObservation(m_OrientationCube.transform.InverseTransformDirection(bp.rb.velocity));
         sensor.AddObservation(m_OrientationCube.transform.InverseTransformDirection(bp.rb.angularVelocity));
 
         //Get position relative to hips in the context of our orientation cube's space
@@ -153,8 +163,8 @@ public class WalkerAgent : Agent
         sensor.AddObservation(Quaternion.FromToRotation(hips.forward, cubeForward));
         sensor.AddObservation(Quaternion.FromToRotation(head.forward, cubeForward));
 
-        //Position of target position relative to cube
-        sensor.AddObservation(m_OrientationCube.transform.InverseTransformPoint(target.transform.position));
+        //Position of target position relative to cube with noise
+        sensor.AddObservation(m_OrientationCube.transform.InverseTransformPoint(m_NoisyTargetPosition));
 
         foreach (var bodyPart in m_JdController.bodyPartsList)
         {
@@ -204,8 +214,13 @@ public class WalkerAgent : Agent
     //Update OrientationCube and DirectionIndicator
     void UpdateOrientationObjects()
     {
-        m_WorldDirToWalk = target.position - hips.position;
-        m_OrientationCube.UpdateOrientation(hips, target);
+        m_WorldDirToWalk = m_NoisyTargetPosition - hips.position;
+        // Create a temporary transform for the noisy target position
+        var tempTarget = new GameObject().transform;
+        tempTarget.position = m_NoisyTargetPosition;
+        m_OrientationCube.UpdateOrientation(hips, tempTarget);
+        DestroyImmediate(tempTarget.gameObject);
+        
         if (m_DirectionIndicator)
         {
             m_DirectionIndicator.MatchOrientation(m_OrientationCube.transform);
@@ -229,7 +244,7 @@ public class WalkerAgent : Agent
             throw new ArgumentException(
                 "NaN in moveTowardsTargetReward.\n" +
                 $" cubeForward: {cubeForward}\n" +
-                $" hips.velocity: {m_JdController.bodyPartsDict[hips].rb.linearVelocity}\n" +
+                $" hips.velocity: {m_JdController.bodyPartsDict[hips].rb.velocity}\n" +
                 $" maximumWalkingSpeed: {m_maxWalkingSpeed}"
             );
         }
@@ -266,7 +281,7 @@ public class WalkerAgent : Agent
         foreach (var item in m_JdController.bodyPartsList)
         {
             numOfRb++;
-            velSum += item.rb.linearVelocity;
+            velSum += item.rb.velocity;
         }
 
         var avgVel = velSum / numOfRb;
