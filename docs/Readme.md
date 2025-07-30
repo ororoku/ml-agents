@@ -15,7 +15,7 @@ $$
 \end{aligned}
 $$
 
-となる。ここで $O$ は観測モデルであり，例えば一様分布ノイズ $o_t = s_t + \eta_t, \quad \eta_t \sim \mathcal{U}([-a, a])$ として定義される[^1]。
+となる。ここで $O$ は観測モデルであり，例えば一様分布ノイズ $o_t = s_t + \eta_t, \quad \eta_t \sim \mathcal{U}([-a, a])$ として定義される。
 
 ## 実装した工夫
 
